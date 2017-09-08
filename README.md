@@ -1,5 +1,4 @@
 # Versio-WeFact
-<<<<<<< HEAD
 # English
 
 1. Copy the folder versio to /Pro/3rdparty/domain/
@@ -47,4 +46,3 @@ Vergeet niet onder product beheer je nieuwe producten toe te voegen.
 Veel succes! Indien je fouten vindt, neem dan contact op met onze helpdesk.
 =======
 Versio module for WeFact
->>>>>>> ea8a8068f47b1c3918f5220e82e0bc87900e6e3a
