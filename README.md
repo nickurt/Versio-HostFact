@@ -44,5 +44,3 @@ If you find anything that is not working as it should, please contact our helpde
 Vergeet niet onder product beheer je nieuwe producten toe te voegen.
 
 Veel succes! Indien je fouten vindt, neem dan contact op met onze helpdesk.
-=======
-Versio module for WeFact
