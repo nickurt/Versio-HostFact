@@ -1,5 +1,4 @@
-# Versio-WeFact
-# English
+# Versio-WeFact English
 
 1. Copy the folder versio to /Pro/3rdparty/domain/
 2. Log in to WeFact
@@ -20,8 +19,7 @@ Don’t forget to add new products under product management.
 
 If you find anything that is not working as it should, please contact our helpdesk.
 
-# Versio-WeFact
-# Dutch
+# Versio-WeFact Dutch
 
 1. Kopieer de map versio naar /Pro/3rdparty/domain/
 2. Log in op WeFact
