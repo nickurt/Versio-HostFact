@@ -1,7 +1,7 @@
 <?php
 $version['name']            = "Versio";
 $version['api_version']     = "1.0 REST API";
-$version['date']            = "2017-08-02";
+$version['date']            = "2017-09-12";
 $version['wefact_version']  = "4.1.0";
 $version['autorenew']       = true;
 $version['handle_support']  = true;
@@ -19,4 +19,6 @@ $version['ssl_support']   	= true;
 $version['dns_management_support'] = true;
 $version['dns_templates_support'] = true;
 $version['dns_records_support'] = true;
+
+$version['site_version']   = '.nl'; // .nl, .eu, .uk
 ?>
