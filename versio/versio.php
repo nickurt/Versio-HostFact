@@ -68,7 +68,7 @@ class Versio implements IRegistrar
 		$httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 		curl_close($ch);
 
-		//$this->setApi_debug(); debug disabled
+		//$this->setApi_debug(); //debug disabled
 		
 		if($this->debug) {
 			$debugdata = array('requesttype' => $requesttype, 'url' => $url, 'postdata' => $data, 'result' => $result, 'httpcode' => $httpcode);
@@ -97,21 +97,18 @@ class Versio implements IRegistrar
 	 */
 	function checkDomain($domain)
 	{
-
     $response = $this->request('GET', '/domains/'.$domain.'/availability');
-
+		
 	if($response['error'])
 		{
 			$this->Error[] = $response['error']['message'];
 		     return false;
 		}
 
-		if($result['availabe'] == true)
+		if($response['available'] == true)
 		{
  			return true;
-		}
-		else
-		{
+		}else{
 			return false;
 		}
 	}
