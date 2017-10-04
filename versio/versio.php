@@ -175,7 +175,7 @@ class Versio implements IRegistrar
 
 		$data = array(
 			'years' => 1,
-			'contact_id' => $ownerHandle['id'],
+			'contact_id' => $ownerHandle,
 			'ns' => $nameservers
 		);
 
@@ -183,7 +183,7 @@ class Versio implements IRegistrar
 
 			if($response['error'])
 		{
-			$this->Error[] = $response['error']['message'];
+			 $this->Error[] = $response['error']['message'];
 		     return false;
 		}
 		else
@@ -252,7 +252,7 @@ class Versio implements IRegistrar
 
 		$data = array(
 			'years' => 1,
-			'contact_id' => $ownerHandle['id'],
+			'contact_id' => $ownerHandle,
 			'auth_code' => $authcode,
 			'ns' => $nameservers
 		);
