@@ -849,7 +849,7 @@ class Versio implements IRegistrar
 
 		if(!$nameservers['ns3'] == null)
 		{
-			$ns[] = array('ns' => $nameservers['ns2'], 'nsip' => '');
+			$ns[] = array('ns' => $nameservers['ns3'], 'nsip' => '');
 		}
 
 		if($nameservers['ns1'] == 'nszero1.axc.nl' || $nameservers['ns2'] == 'nszero2.axc.nl')
