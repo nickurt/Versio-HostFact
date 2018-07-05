@@ -1,8 +1,8 @@
 <?php
 $version['name']            = "Versio";
 $version['api_version']     = "1.0 REST API";
-$version['date']            = "2017-09-12";
-$version['wefact_version']  = "4.1.0";
+$version['date']            = "2018-07-05";
+$version['wefact_version']  = "5.0.0";
 $version['autorenew']       = true;
 $version['handle_support']  = true;
 $version['cancel_direct']   = true;
