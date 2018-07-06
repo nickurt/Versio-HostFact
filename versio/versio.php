@@ -12,6 +12,7 @@ class Versio implements IRegistrar
     public $Error;
     public $Warning;
     public $Success;
+
     public $Period = 1;
     public $registrarHandles = array();
 
@@ -19,9 +20,6 @@ class Versio implements IRegistrar
 
     private $ClassName;
 
-    /**
-     * Versio constructor.
-     */
     function __construct()
     {
         $this->ClassName = __CLASS__;
@@ -32,10 +30,8 @@ class Versio implements IRegistrar
     }
 
     /**
-     * Check whether a domain is already registered or not.
-     *
-     * @param $domain The name of the domain that needs to be checked.
-     * @return bool True if free, False if not free, False and $this->Error[] in case of error.
+     * @param $domain
+     * @return bool
      */
     function checkDomain($domain)
     {
@@ -54,78 +50,75 @@ class Versio implements IRegistrar
     }
 
     /**
-     * @param $requesttype
-     * @param $request
-     * @param array $data
-     * @return array|mixed
+     * @param $whois
+     * @param $type
+     * @return bool|mixed
      */
-    function request($requesttype, $request, $data = array())
+    function createContact($whois, $type = HANDLE_OWNER)
     {
-        require("version.php");
-
-        if ($this->Testmode == '1') {
-            $this->endpoint = 'https://www.versio' . $version['site_version'] . '/testapi/v1';
-        } else {
-            $this->endpoint = 'https://www.versio' . $version['site_version'] . '/api/v1';
+        // Determine which contact type should be found
+        switch ($type) {
+            case HANDLE_OWNER:
+                $prefix = "owner";
+                break;
+            case HANDLE_ADMIN:
+                $prefix = "admin";
+                break;
+            case HANDLE_TECH:
+                $prefix = "tech";
+                break;
+            default:
+                $prefix = "";
+                break;
         }
 
-        $url = $this->endpoint . $request;
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_USERPWD, $this->User . ":" . $this->Password);
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $requesttype);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        $result = curl_exec($ch);
-        $httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+        $whois->getParam($prefix, 'Address');
 
-        //$this->setApi_debug(); //debug disabled
+        $countryCode = $whois->{$prefix . 'Country'};
 
-        if ($this->debug) {
-            $debugdata = array('requesttype' => $requesttype, 'url' => $url, 'postdata' => $data, 'result' => $result, 'httpcode' => $httpcode);
-            var_dump($debugdata);
+        if (strlen($countryCode) > 2) {
+            $countryCode = str_replace('EU-', '', $countryCode);
         }
 
-        $codes = array('200', '201', '202', '400', '401', '404');
+        if (strlen($countryCode) != 2) {
+            $countryCode = 'NL';
+        }
 
-        $result = json_decode($result, 1);
-        $result['httpcode'] = $httpcode;
+        $sStreet = $whois->{$prefix . 'Address'};
+        $iNumber = filter_var($sStreet, FILTER_SANITIZE_NUMBER_INT);
+        $sStreet = str_replace($iNumber, '', $sStreet);
 
-        if (in_array($httpcode, $codes)) {
-            return $result;
+        // registrant information
+        $contactDetails = array();
+        $contactDetails['company'] = $whois->{$prefix . 'CompanyName'};
+        $contactDetails['firstname'] = $whois->{$prefix . 'Initials'};
+        $contactDetails['surname'] = $whois->{$prefix . 'SurName'};
+        $contactDetails['email'] = $whois->{$prefix . 'EmailAddress'};
+        $contactDetails['phone'] = $whois->{$prefix . 'PhoneNumber'};
+        $contactDetails['street'] = $sStreet;
+        $contactDetails['number'] = $iNumber;
+        $contactDetails['number_addition'] = $whois->{$prefix . 'StreetNumberAddon'};
+        $contactDetails['zipcode'] = $whois->{$prefix . 'ZipCode'};
+        $contactDetails['city'] = $whois->{$prefix . 'City'};
+        $contactDetails['country'] = $countryCode;
+
+        $response = $this->request('POST', '/contacts', $contactDetails);
+
+        if ($response['error']) {
+            $this->Error[] = $response['error']['message'];
+            return false;
         } else {
-            $error = array();
-            $error['error']['message'] = 'Request failed';
-            return $error;
+            return $response['contact_id'];
         }
     }
 
     /**
-     * Delete a domain
-     *
-     * @param $domain The name of the domain that you want to delete.
-     * @param string $delType end|now
-     * @return bool True if the domain was succesfully removed; False otherwise;
+     * @param $handle
+     * @return bool
      */
-    function deleteDomain($domain, $delType = 'end')
+    function deleteContact($handle)
     {
-        return $this->setDomainAutoRenew($domain, false);
-    }
-
-    /**
-     * Change the autorenew state of the given domain. When autorenew is enabled, the domain will be extended.
-     *
-     * @param $domain The domainname to change the autorenew setting for,
-     * @param bool $autorenew The new autorenew setting (True = On|False = Off)
-     * @return bool True when the setting is succesfully changed; False otherwise
-     */
-    function setDomainAutoRenew($domain, $autorenew = true)
-    {
-        $settings = array();
-        $settings['auto_renew'] = $autorenew;
-
-        $response = $this->request('POST', '/domains/' . $domain . '/update', $settings);
+        $response = $this->request('DELETE', '/contacts/' . $handle);
 
         if ($response['error']) {
             $this->Error[] = $response['error']['message'];
@@ -136,8 +129,16 @@ class Versio implements IRegistrar
     }
 
     /**
-     * Optional function to check the status of a registration or transfer, see appendix B of documentation
-     *
+     * @param $domain
+     * @param string $delType
+     * @return bool
+     */
+    function deleteDomain($domain, $delType = 'end')
+    {
+        return $this->setDomainAutoRenew($domain, false);
+    }
+
+    /**
      * @param $domain
      * @param $pendingInfo
      * @return bool|string
@@ -155,20 +156,16 @@ class Versio implements IRegistrar
                     $this->Success[] = "Domeinnaam '" . $domain . "' is succesvol aangevraagd.";
                     return true;
                     break;
-
                 case 'PENDING':
                     return 'pending';
                     break;
-
                 case 'INACTIVE':
                     $this->Error[] = "Domeinnaam '" . $domain . "' aangevraag is mislukt.";
                     return false;
                     break;
-
                 case 'PENDING_TRANSFER':
                     return 'pending';
                     break;
-
                 default:
                     return 'pending';
             }
@@ -176,18 +173,13 @@ class Versio implements IRegistrar
     }
 
     /**
-     * Extend a domain for several years
-     * This function is currently not used in WeFact Hosting
-     *
-     * @param $domain The name of the domain you want to extend.
-     * @param $nyears The number of year the domain should be extended.
-     * @return bool True if the domain was extended succesfully; False otherwise;
+     * @param $domain
+     * @param $nyears
+     * @return bool
      */
     function extendDomain($domain, $nyears)
     {
-        $data = array(
-            'years' => $nyears
-        );
+        $data = array('years' => $nyears);
 
         $response = $this->request('POST', '/domains/' . $domain, $data);
 
@@ -200,10 +192,8 @@ class Versio implements IRegistrar
     }
 
     /**
-     * Get information available of the requested contact.
-     *
-     * @param string $handle The handle of the contact to request.
-     * @return array Information available about the requested contact.
+     * @param $handle
+     * @return bool|whois
      */
     function getContact($handle)
     {
@@ -231,10 +221,44 @@ class Versio implements IRegistrar
     }
 
     /**
-     * Get a list of contact handles available
-     *
-     * @param string $surname Surname to limit the number of records in the list.
-     * @return array List of all contact matching the $surname search criteria.
+     * @param array $whois
+     * @param $type
+     * @return bool
+     */
+    function getContactHandle($whois = array(), $type = HANDLE_OWNER)
+    {
+        // Determine which contact type should be found
+        switch ($type) {
+            case HANDLE_OWNER:
+                $prefix = "owner";
+                break;
+            case HANDLE_ADMIN:
+                $prefix = "admin";
+                break;
+            case HANDLE_TECH:
+                $prefix = "tech";
+                break;
+            default:
+                $prefix = "";
+                break;
+        }
+
+        unset($handle);
+        unset($reponse);
+
+        $response = $this->request('GET', '/contacts' . $whois->ownerRegistrarHandles['versio']);
+
+        if ($response['error']) {
+            $this->Error[] = $response['error']['message'];
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    /**
+     * @param string $surname
+     * @return array|bool
      */
     function getContactList($surname = "")
     {
@@ -270,8 +294,7 @@ class Versio implements IRegistrar
     }
 
     /**
-     * Get all the dns templates
-     * @return(array) or throw false
+     * @return array|bool
      */
     function getDNSTemplates()
     {
@@ -295,8 +318,6 @@ class Versio implements IRegistrar
     }
 
     /**
-     * Get the DNS zone of a domain
-     *
      * @param $domain
      * @return array|bool
      */
@@ -326,10 +347,8 @@ class Versio implements IRegistrar
     }
 
     /**
-     * Get all available information of the given domain
-     *
-     * @param $domain The domain for which the information is requested.
-     * @return array|bool|mixed The array containing all information about the given domain
+     * @param $domain
+     * @return array|bool|mixed
      */
     function getDomainInformation($domain)
     {
@@ -369,34 +388,8 @@ class Versio implements IRegistrar
     }
 
     /**
-     * Get EPP code/token
-     *
-     * @param $domain
-     * @return bool|string
-     */
-    function getToken($domain)
-    {
-        $aDomain = explode('.', $domain);
-
-        $response = $this->request('GET', '/domains/' . $domain . '?show_epp_code=true');
-
-        if ($response['error']) {
-            $this->Error[] = $response['error']['message'];
-            return false;
-        } else {
-            if ($aDomain[1] == 'be') {
-                return 'EPP code will be sent by email';
-            } else {
-                return $response['domainInfo']['epp_code'];
-            }
-        }
-    }
-
-    /**
-     * Get a list of all the domains.
-     *
-     * @param string $contactHandle The handle of a contact, so the list could be filtered (usefull for updating domain whois data)
-     * @return array|bool A list of all domains available in the system.
+     * @param string $contactHandle
+     * @return array|bool
      */
     function getDomainList($contactHandle = "")
     {
@@ -468,8 +461,6 @@ class Versio implements IRegistrar
     }
 
     /**
-     * get domain whois handles
-     *
      * @param $domain
      * @return array|bool
      */
@@ -498,9 +489,7 @@ class Versio implements IRegistrar
     }
 
     /**
-     * Check domain information for one or more domains
-     *
-     * @param $list_domains Array with list of domains. Key is domain, value must be filled.
+     * @param $list_domains
      * @return mixed
      */
     function getSyncData($list_domains)
@@ -547,8 +536,28 @@ class Versio implements IRegistrar
     }
 
     /**
-     * Get class version information.
-     *
+     * @param $domain
+     * @return bool|string
+     */
+    function getToken($domain)
+    {
+        $aDomain = explode('.', $domain);
+
+        $response = $this->request('GET', '/domains/' . $domain . '?show_epp_code=true');
+
+        if ($response['error']) {
+            $this->Error[] = $response['error']['message'];
+            return false;
+        } else {
+            if ($aDomain[1] == 'be') {
+                return 'EPP code will be sent by email';
+            } else {
+                return $response['domainInfo']['epp_code'];
+            }
+        }
+    }
+
+    /**
      * @return mixed
      */
     static function getVersionInformation()
@@ -558,11 +567,9 @@ class Versio implements IRegistrar
     }
 
     /**
-     * Change the lock status of the specified domain.
-     *
-     * @param $domain The domain to change the lock state for
-     * @param bool $lock The new lock state (True|False)
-     * @return bool True is the lock state was changed succesfully
+     * @param $domain
+     * @param bool $lock
+     * @return bool
      */
     function lockDomain($domain, $lock = true)
     {
@@ -579,19 +586,17 @@ class Versio implements IRegistrar
     }
 
     /**
-     * Register a new domain
-     *
-     * @param $domain The domainname that needs to be registered.
-     * @param array $nameservers The nameservers for the new domain.
-     * @param null $whois The customer information for the domain's whois information.
-     * @return bool True on success; False otherwise.
+     * @param $domain
+     * @param array $nameservers
+     * @param null $whois
+     * @return bool
      */
     function registerDomain($domain, $nameservers = array(), $whois = null)
     {
         $ownerHandle = "";
 
-        if (isset($whois->ownerRegistrarHandles[$class])) {
-            $ownerHandle = $whois->ownerRegistrarHandles[$class];
+        if (isset($whois->ownerRegistrarHandles[$this->ClassName])) {
+            $ownerHandle = $whois->ownerRegistrarHandles[$this->ClassName];
         } elseif ($whois->ownerSurName != "") {
             $ownerHandle = $this->getContactHandle($whois, HANDLE_OWNER);
 
@@ -650,118 +655,62 @@ class Versio implements IRegistrar
     }
 
     /**
-     * Get the handle of a contact.
-     *
-     * @param array $whois The whois information of contact
-     * @param string $type The type of person. This is used to access the right fields in the whois object.
-     * @return string handle of the requested contact; False if the contact could not be found.
+     * @param $requesttype
+     * @param $request
+     * @param array $data
+     * @return array|mixed
      */
-    function getContactHandle($whois = array(), $type = HANDLE_OWNER)
+    function request($requesttype, $request, $data = array())
     {
+        require("version.php");
 
-        // Determine which contact type should be found
-        switch ($type) {
-            case HANDLE_OWNER:
-                $prefix = "owner";
-                break;
-            case HANDLE_ADMIN:
-                $prefix = "admin";
-                break;
-            case HANDLE_TECH:
-                $prefix = "tech";
-                break;
-            default:
-                $prefix = "";
-                break;
+        if ($this->Testmode == '1') {
+            $this->endpoint = 'https://www.versio' . $version['site_version'] . '/testapi/v1';
+        } else {
+            $this->endpoint = 'https://www.versio' . $version['site_version'] . '/api/v1';
         }
 
-        unset($handle);
-        unset($reponse);
+        $url = $this->endpoint . $request;
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_USERPWD, $this->User . ":" . $this->Password);
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $requesttype);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $result = curl_exec($ch);
+        $httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
 
-        $response = $this->request('GET', '/contacts' . $whois->ownerRegistrarHandles['versio']);
+        //$this->setApi_debug(); //debug disabled
 
-        if ($response['error']) {
-            $this->Error[] = $response['error']['message'];
-            return false;
+        if ($this->debug) {
+            $debugdata = array('requesttype' => $requesttype, 'url' => $url, 'postdata' => $data, 'result' => $result, 'httpcode' => $httpcode);
+            var_dump($debugdata);
+        }
+
+        $codes = array('200', '201', '202', '400', '401', '404');
+
+        $result = json_decode($result, 1);
+        $result['httpcode'] = $httpcode;
+
+        if (in_array($httpcode, $codes)) {
+            return $result;
         } else {
-            return true;
+            $error = array();
+            $error['error']['message'] = 'Request failed';
+            return $error;
         }
     }
 
     /**
-     * Create a new whois contact
-     *
-     * @param    array $whois The whois information for the new contact.
-     * @param    mixed $type The contact type. This is only used to access the right data in the $whois object.
-     * @return    bool                    Handle when the new contact was created succesfully; False otherwise.
-     */
-    function createContact($whois, $type = HANDLE_OWNER)
-    {
-        // Determine which contact type should be found
-        switch ($type) {
-            case HANDLE_OWNER:
-                $prefix = "owner";
-                break;
-            case HANDLE_ADMIN:
-                $prefix = "admin";
-                break;
-            case HANDLE_TECH:
-                $prefix = "tech";
-                break;
-            default:
-                $prefix = "";
-                break;
-
-        }
-        $whois->getParam($prefix, 'Address');
-
-        $countryCode = $whois->{$prefix . 'Country'};
-
-        if (strlen($countryCode) > 2) {
-            $countryCode = str_replace('EU-', '', $countryCode);
-        }
-
-        if (strlen($countryCode) != 2) {
-            $countryCode = 'NL';
-        }
-
-        $sStreet = $whois->{$prefix . 'Address'};
-        $iNumber = filter_var($sStreet, FILTER_SANITIZE_NUMBER_INT);
-        $sStreet = str_replace($iNumber, '', $sStreet);
-
-        // registrant information
-        $contactDetails = array();
-        $contactDetails['company'] = $whois->{$prefix . 'CompanyName'};
-        $contactDetails['firstname'] = $whois->{$prefix . 'Initials'};
-        $contactDetails['surname'] = $whois->{$prefix . 'SurName'};
-        $contactDetails['email'] = $whois->{$prefix . 'EmailAddress'};
-        $contactDetails['phone'] = $whois->{$prefix . 'PhoneNumber'};
-        $contactDetails['street'] = $sStreet;
-        $contactDetails['number'] = $iNumber;
-        $contactDetails['number_addition'] = $whois->{$prefix . 'StreetNumberAddon'};
-        $contactDetails['zipcode'] = $whois->{$prefix . 'ZipCode'};
-        $contactDetails['city'] = $whois->{$prefix . 'City'};
-        $contactDetails['country'] = $countryCode;
-
-        $response = $this->request('POST', '/contacts', $contactDetails);
-
-        if ($response['error']) {
-            $this->Error[] = $response['error']['message'];
-            return false;
-        } else {
-            return $response['contact_id'];
-        }
-    }
-
-    /**
-     * save a dns zone
-     * @param(string) the domain
-     * @param(string) the dns zone
+     * @param $domain
+     * @param $dns_zone
+     * @return bool
      */
     function saveDNSZone($domain, $dns_zone)
     {
-
         $dns = array();
+
         foreach ($dns_zone['records'] as $records) {
             if ($records['name'] == null) {
                 $name = $domain . '.';
@@ -796,10 +745,28 @@ class Versio implements IRegistrar
     }
 
     /**
-     * Download the CSR of a SSL certificate from the registrar
-     *
-     * @param string $ssl_order_id Order id from a SSL certificate
-     * @return bool|string
+     * @param $domain
+     * @param bool $autorenew
+     * @return bool
+     */
+    function setDomainAutoRenew($domain, $autorenew = true)
+    {
+        $settings = array();
+        $settings['auto_renew'] = $autorenew;
+
+        $response = $this->request('POST', '/domains/' . $domain . '/update', $settings);
+
+        if ($response['error']) {
+            $this->Error[] = $response['error']['message'];
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    /**
+     * @param $ssl_order_id
+     * @return bool
      */
     function ssl_download_ssl_certificate($ssl_order_id)
     {
@@ -814,17 +781,14 @@ class Versio implements IRegistrar
     }
 
     /**
-     * Retrieve the approver emailadresses for a SSL certificate from the registrar
-     *
-     * @param string $commonname Domain name
-     * @param string $templatename ID of the product as retrieved by ssl_list_products()
+     * @param $domain
+     * @param $templatename
      * @return array|bool
      */
     function ssl_get_approver_list($domain, $templatename)
     {
         $response = $this->request('GET', '/sslapprovers/' . $domain);
 
-        // provide feedback
         if ($response['error']) {
             $this->Error[] = $response['error']['message'];
             return false;
@@ -834,28 +798,24 @@ class Versio implements IRegistrar
             foreach ($response['approverList'] as $approver) {
                 $approverEmails[] = $approver;
             }
+
             return $approverEmails;
         }
     }
 
     /**
-     * Get SSL product from registrar
-     *
-     * @param string $templatename ID of the product as retrieved by ssl_list_products()
+     * @param $templatename
      * @return array
      */
     function ssl_get_product($templatename)
     {
         foreach ($this->ssl_list_products() as $sslProductList) {
-
             if ($sslProductList['templatename'] == $templatename) {
                 $sslProduct = $sslProductList;
             }
         }
 
-
         $product_info = array();
-
 
         $product_info['name'] = $sslProduct['name'];
         $product_info['brand'] = $sslProduct['brand'];
@@ -865,6 +825,7 @@ class Versio implements IRegistrar
         $product_info['wildcard'] = ($sslProduct['wildcard'] != NULL) ? TRUE : FALSE;
         $product_info['multidomain'] = ($sslProduct['multidomain_max'] != NULL) ? TRUE : FALSE;
         // $product_info['multidomain_included']	= ($sslProduct['domains']) ? $sslProduct['domains'] : 0;
+
         if ($product_info['multidomain_max'])
             $product_info['multidomain_max'] = 99;
 
@@ -874,8 +835,7 @@ class Versio implements IRegistrar
         if (isset($sslProduct['pricing'])) {
             foreach ($sslProduct['pricing']['period'] as $index => $period_fee) {
                 // please note: periods should be in years, not months
-                $product_info['periods'][] = array('periods' => $index,
-                    'price' => $period_fee);
+                $product_info['periods'][] = array('periods' => $index, 'price' => $period_fee);
             }
         }
 
@@ -883,27 +843,50 @@ class Versio implements IRegistrar
     }
 
     /**
-     * Retrieve all SSL products from registrar
-     *
-     * @param string $ssl_type Optional filter for SSL validation type
-     * @return array
+     * @param $ssl_order_id
+     * @return array|bool
      */
-    function ssl_list_products($ssl_type = '')
+    function ssl_get_request_status($ssl_order_id)
     {
+        $response = $this->request('GET', '/sslcertificates/' . $ssl_order_id);
 
-        # empty array
-        $products_array = array();
-
-        $response = $this->request('GET', '/sslproducts');
-
-        # provide feedback
         if ($response['error']) {
             $this->Error[] = $response['error']['message'];
             return false;
         } else {
+            $order_info = array();
 
+            switch ($response['SSLcertificateInfo']['status']) {
+                case 'PENDING_VALIDATION':
+                    $order_info['status'] = 'inrequest';
+                    break;
+                case 'PENDING':
+                    $order_info['status'] = 'inrequest';
+                    break;
+                case 'ISSUED':
+                    $order_info['status'] = 'install';
+                    break;
+            }
+
+            return $order_info;
+        }
+    }
+
+    /**
+     * @param string $ssl_type
+     * @return array|bool
+     */
+    function ssl_list_products($ssl_type = '')
+    {
+        $products_array = array();
+
+        $response = $this->request('GET', '/sslproducts');
+
+        if ($response['error']) {
+            $this->Error[] = $response['error']['message'];
+            return false;
+        } else {
             foreach ($response['sslproductsList'] as $sslproducts) {
-
                 $product['name'] = $sslproducts['supplier'] . ' (' . $sslproducts['type'] . ')';
                 $product['brand'] = $sslproducts['supplier'];
                 $product['templatename'] = $sslproducts['id'];
@@ -917,9 +900,7 @@ class Versio implements IRegistrar
                     3 => $sslproducts['prices']['3_year']
                 );
 
-                # push it
                 array_push($products_array, $product);
-
             }
 
             return $products_array;
@@ -927,46 +908,9 @@ class Versio implements IRegistrar
     }
 
     /**
-     * Retrieve the status of a SSL certificate from the registrar
-     *
-     * @param string $ssl_order_id Order id from a SSL certificate
-     * @return array
-     */
-    function ssl_get_request_status($ssl_order_id)
-    {
-        $response = $this->request('GET', '/sslcertificates/' . $ssl_order_id);
-
-        if ($response['error']) {
-            $this->Error[] = $response['error']['message'];
-            return false;
-        } else {
-
-            $order_info = array();
-
-            switch ($response['SSLcertificateInfo']['status']) {
-                case 'PENDING_VALIDATION':
-                    $order_info['status'] = 'inrequest';
-                    break;
-
-                case 'PENDING':
-                    $order_info['status'] = 'inrequest';
-                    break;
-
-                case 'ISSUED':
-                    $order_info['status'] = 'install';
-                    break;
-            }
-            // return order information
-            return $order_info;
-        }
-    }
-
-    /**
-     * Reissue a SSL certificate at the registrar
-     *
-     * @param string $ssl_order_id Order id from a SSL certificate
-     * @param array $ssl_info Array with info regarding the SSL certificate
-     * @param object $whois Object with WHOIS data
+     * @param $ssl_order_id
+     * @param $ssl_info
+     * @param $whois
      * @return bool
      */
     function ssl_reissue_certificate($ssl_order_id, $ssl_info, $whois)
@@ -980,7 +924,6 @@ class Versio implements IRegistrar
 
         $response = $this->request('POST', '/sslcertificates/' . $ssl_order_id . '/reissue', $sslDetails);
 
-        # provide feedback
         if ($response['error']) {
             $this->Error[] = $response['error']['message'];
             return false;
@@ -990,11 +933,9 @@ class Versio implements IRegistrar
     }
 
     /**
-     * Renew the SSL certificate at the registrar
-     *
-     * @param array $ssl_info Array with info regarding the SSL certificate
-     * @param object $whois Object with WHOIS data
-     * @return bool
+     * @param $ssl_info
+     * @param $whois
+     * @return bool|mixed
      */
     function ssl_renew_certificate($ssl_info, $whois)
     {
@@ -1002,11 +943,9 @@ class Versio implements IRegistrar
     }
 
     /**
-     * Request the SSL certificate at the registrar
-     *
-     * @param array $ssl_info Array with info regarding the SSL certificate
-     * @param object $whois Object with WHOIS data
-     * @return bool
+     * @param $ssl_info
+     * @param $whois
+     * @return bool|mixed
      */
     function ssl_request_certificate($ssl_info, $whois)
     {
@@ -1026,7 +965,6 @@ class Versio implements IRegistrar
 
         $response = $this->request('POST', '/sslcertificates', $sslDetails);
 
-        # provide feedback
         if ($response['error']) {
             $this->Error[] = $response['error']['message'];
             return false;
@@ -1036,33 +974,26 @@ class Versio implements IRegistrar
     }
 
     /**
-     * Resend the approver email
-     *
-     * @param string $ssl_order_id Order id from a SSL certificate
-     * @param $approver_emailaddress    Approver emailaddress
+     * @param $ssl_order_id
+     * @param $approver_emailaddress
      * @return bool
      */
     function ssl_resend_approver_email($ssl_order_id, $approver_emailaddress)
     {
-        $sslDetails = array(
-            "approver_email" => $approver_emailaddress);
+        $sslDetails = array("approver_email" => $approver_emailaddress);
 
         $response = $this->request('POST', '/sslcertificates/' . $ssl_order_id . '/changeapprover', $sslDetails);
 
-        # provide feedback
         if ($response['error']) {
             $this->Error[] = $response['error']['message'];
             return false;
         } else {
             return true;
         }
-
     }
 
     /**
-     * Revoke SSL certificate at the registrar
-     *
-     * @param string $ssl_order_id Order id from a SSL certificate
+     * @param $ssl_order_id
      * @return bool
      */
     function ssl_revoke_ssl_certificate($ssl_order_id)
@@ -1073,7 +1004,6 @@ class Versio implements IRegistrar
             $this->Error[] = $response['error']['message'];
             return false;
         } else {
-
             if ($response['status'] == 'CANCELLED') {
                 return true;
             } else {
@@ -1083,19 +1013,18 @@ class Versio implements IRegistrar
     }
 
     /**
-     * Transfer a domain to the given user.
-     *
-     * @param    string $domain The demainname that needs to be transfered.
-     * @param    array $nameservers The nameservers for the tranfered domain.
-     * @param    array $whois The contact information for the new owner, admin, tech and billing contact.
-     * @return    bool                    True on success; False otherwise;
+     * @param $domain
+     * @param array $nameservers
+     * @param null $whois
+     * @param string $authcode
+     * @return bool
      */
     function transferDomain($domain, $nameservers = array(), $whois = null, $authcode = "")
     {
         $ownerHandle = "";
 
-        if (isset($whois->ownerRegistrarHandles[$class])) {
-            $ownerHandle = $whois->ownerRegistrarHandles[$class];
+        if (isset($whois->ownerRegistrarHandles[$this->ClassName])) {
+            $ownerHandle = $whois->ownerRegistrarHandles[$this->ClassName];
         } elseif ($whois->ownerSurName != "") {
             $ownerHandle = $this->getContactHandle($whois, HANDLE_OWNER);
             if ($ownerHandle == "") {
@@ -1154,100 +1083,21 @@ class Versio implements IRegistrar
     }
 
     /**
-     * Update the whois information for the given contact person.
-     *
-     * @param $handle The handle of the contact to be changed.
-     * @param $whois The new whois information for the given contact.
-     * @param $type The of contact. This is used to access the right fields in the whois array
-     * @return bool|mixed
+     * @param $handle
+     * @param $whois
+     * @param $type
+     * @return bool
      */
     function updateContact($handle, $whois, $type = HANDLE_OWNER)
     {
         $this->Error[] = sprintf("Versio: Het bewerken van een contact is niet mogelijk.");
         return false;
-
-        $this->deleteContact($handle);
-
-        switch ($type) {
-            case HANDLE_OWNER:
-                $prefix = "owner";
-                break;
-            case HANDLE_ADMIN:
-                $prefix = "admin";
-                break;
-            case HANDLE_TECH:
-                $prefix = "tech";
-                break;
-            default:
-                $prefix = "";
-                break;
-
-        }
-
-        $whois->getParam($prefix, 'Address');
-
-        $countryCode = $whois->{$prefix . 'Country'};
-
-        if (strlen($countryCode) > 2) {
-            $countryCode = str_replace('EU-', '', $countryCode);
-        }
-
-        if (strlen($countryCode) != 2) {
-            $countryCode = 'NL';
-        }
-
-        $sStreet = $whois->{$prefix . 'Address'};
-        $iNumber = filter_var($sStreet, FILTER_SANITIZE_NUMBER_INT);
-        $sStreet = str_replace($iNumber, '', $sStreet);
-
-        // registrant information
-        $contactDetails = array();
-        $contactDetails['company'] = $whois->{$prefix . 'CompanyName'};
-        $contactDetails['firstname'] = $whois->{$prefix . 'Initials'};
-        $contactDetails['surname'] = $whois->{$prefix . 'SurName'};
-        $contactDetails['email'] = $whois->{$prefix . 'EmailAddress'};
-        $contactDetails['phone'] = $whois->{$prefix . 'PhoneNumber'};
-        $contactDetails['street'] = $sStreet;
-        $contactDetails['number'] = $iNumber;
-        $contactDetails['number_addition'] = $whois->{$prefix . 'StreetNumberAddon'};
-        $contactDetails['zipcode'] = $whois->{$prefix . 'ZipCode'};
-        $contactDetails['city'] = $whois->{$prefix . 'City'};
-        $contactDetails['country'] = $countryCode;
-
-        $response = $this->request('POST', '/contacts', $contactDetails);
-
-        if ($response['error']) {
-            $this->Error[] = $response['error']['message'];
-            return false;
-        } else {
-            return $response['contact_id'];
-        }
     }
 
     /**
-     * Delete a contact
-     *
-     * @param $handle Information available about the requested contact.
-     * @return bool
-     */
-    function deleteContact($handle)
-    {
-        $response = $this->request('DELETE', '/contacts/' . $handle);
-
-        if ($response['error']) {
-            $this->Error[] = $response['error']['message'];
-            return false;
-        } else {
-            return true;
-        }
-    }
-
-    /**
-     * Update the domain Whois data, but only if no handles are used by the registrar.
-     *
      * @param $domain
      * @param $whois
-     * @return bool True if succesfull, false otherwise
+     * @return bool
      */
     function updateDomainWhois($domain, $whois)
     {
@@ -1275,11 +1125,9 @@ class Versio implements IRegistrar
     }
 
     /**
-     * Update the nameservers for the given domain.
-     *
-     * @param $domain The domain to be changed.
-     * @param array $nameservers The new set of nameservers.
-     * @return bool True if the update was succesfull; False otherwise;
+     * @param $domain
+     * @param array $nameservers
+     * @return bool
      */
     function updateNameServers($domain, $nameservers = array())
     {
