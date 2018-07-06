@@ -62,8 +62,10 @@ class Versio implements IRegistrar
     private $ClassName = __CLASS__;
 
     /**
-     * @param $domain
-     * @return bool
+     * Check whether a domain is already registered or not.
+     *
+     * @param string $domain The name of the domain that needs to be checked.
+     * @return bool True if free, False if not free, False and $this->Error[] in case of error.
      */
     public function checkDomain($domain)
     {
@@ -74,17 +76,15 @@ class Versio implements IRegistrar
             return false;
         }
 
-        if ($response['available'] == true) {
-            return true;
-        } else {
-            return false;
-        }
+        return (bool) $response['available'];
     }
 
     /**
-     * @param $whois
-     * @param $type
-     * @return bool|mixed
+     * Create a new whois contact
+     *
+     * @param array $whois The whois information for the new contact.
+     * @param mixed $type The contact type. This is only used to access the right data in the $whois object.
+     * @return bool|mixed Handle when the new contact was created successfully; False otherwise
      */
     public function createContact($whois, $type = HANDLE_OWNER)
     {
@@ -145,8 +145,10 @@ class Versio implements IRegistrar
     }
 
     /**
-     * @param $handle
-     * @return bool
+     * Delete a whois contact
+     *
+     * @param string $handle The handle of a contact
+     * @return bool True if deleted, False and $this->Error[] in case of error.
      */
     public function deleteContact($handle)
     {
@@ -161,9 +163,11 @@ class Versio implements IRegistrar
     }
 
     /**
-     * @param $domain
-     * @param string $delType
-     * @return bool
+     * Delete a domain
+     *
+     * @param string $domain The name of the domain that you want to delete.
+     * @param string $delType end|now
+     * @return bool True if the domain was successfully removed; False otherwise;
      */
     public function deleteDomain($domain, $delType = 'end')
     {
@@ -205,15 +209,15 @@ class Versio implements IRegistrar
     }
 
     /**
-     * @param $domain
-     * @param $nyears
+     * @param string $domain
+     * @param integer $nyears
      * @return bool
      */
     public function extendDomain($domain, $nyears)
     {
-        $data = array('years' => $nyears);
-
-        $response = $this->request('POST', '/domains/' . $domain, $data);
+        $response = $this->request('POST', '/domains/' . $domain, [
+            'years' => $nyears
+        ]);
 
         if ($response['error']) {
             $this->Error[] = $response['error']['message'];
@@ -224,8 +228,10 @@ class Versio implements IRegistrar
     }
 
     /**
-     * @param $handle
-     * @return bool|whois
+     * Get information availabe of the requested contact.
+     *
+     * @param string $handle The handle of the contact to request.
+     * @return bool|array Information available about the requested contact.
      */
     public function getContact($handle)
     {
@@ -253,11 +259,13 @@ class Versio implements IRegistrar
     }
 
     /**
-     * @param array $whois
-     * @param $type
+     * Get the handle of a contact.
+     *
+     * @param array $whois The whois information of contact
+     * @param string $type The type of person. This is used to access the right fields in the whois object.
      * @return bool
      */
-    public function getContactHandle($whois = array(), $type = HANDLE_OWNER)
+    public function getContactHandle($whois = [], $type = HANDLE_OWNER)
     {
         // Determine which contact type should be found
         switch ($type) {
@@ -289,8 +297,10 @@ class Versio implements IRegistrar
     }
 
     /**
-     * @param string $surname
-     * @return array|bool
+     * Get a list of contact handles available
+     *
+     * @param string $surname Surname to limit the number of records in the list.
+     * @return array|bool List of all contact matching the $surname search criteria.
      */
     public function getContactList($surname = "")
     {
@@ -326,7 +336,9 @@ class Versio implements IRegistrar
     }
 
     /**
-     * @return array|bool
+     * Retrieve all DNS templates from registrar
+     *
+     * @return array|bool List of all DNS templates
      */
     public function getDNSTemplates()
     {
@@ -350,8 +362,10 @@ class Versio implements IRegistrar
     }
 
     /**
-     * @param $domain
-     * @return array|bool
+     * Get the DNS zone of a domain
+     *
+     * @param string $domain The domain
+     * @return array|bool Array with DNS zone info and DNS records
      */
     public function getDNSZone($domain)
     {
@@ -379,8 +393,10 @@ class Versio implements IRegistrar
     }
 
     /**
-     * @param $domain
-     * @return array|bool|mixed
+     * Get all available information of the given domain
+     *
+     * @param string $domain The domain for which the information is requested.
+     * @return array|bool|mixed The array containing all information about the given domain
      */
     public function getDomainInformation($domain)
     {
@@ -404,24 +420,26 @@ class Versio implements IRegistrar
                 $whois->techHandle = $response['domainInfo']['registrant_id'];
             }
 
-            $response = array(
+            $response = [
                 'Domain' => $domain,
-                'Information' => array(
+                'Information' => [
                     'nameservers' => $response['domainInfo']['ns'],
                     'whois' => $whois,
                     'expiration_date' => $response['domainInfo']['expire-date'],
                     'registration_date' => date("Y-m-d", $lastyear),
                     'authkey' => $this->getToken($domain)
-                )
-            );
+                ]
+            ];
 
             return $response;
         }
     }
 
     /**
-     * @param string $contactHandle
-     * @return array|bool
+     * Get a list of all the domains
+     *
+     * @param string $contactHandle The handle of a contact, so the list could be filtered (usefull for updating domain whois data)
+     * @return array|bool A list of all domains available in the system.
      */
     public function getDomainList($contactHandle = "")
     {
@@ -479,12 +497,12 @@ class Versio implements IRegistrar
 
             $domain = [];
             $domain['Domain'] = $domainlist['domain'];
-            $domain['Information'] = array(
+            $domain['Information'] = [
                 'nameservers' => $nameservers,
                 'whois' => $whois,
                 'expiration_date' => $domainlist['expire-date'],
                 'registration_date' => date("Y-m-d", $lastyear)
-            );
+            ];
 
             array_push($domainsList, $domain);
         }
@@ -493,8 +511,10 @@ class Versio implements IRegistrar
     }
 
     /**
-     * @param $domain
-     * @return array|bool
+     * Get domain whois handles
+     *
+     * @param string $domain Domain
+     * @return array|bool Handles
      */
     public function getDomainWhois($domain)
     {
@@ -521,8 +541,10 @@ class Versio implements IRegistrar
     }
 
     /**
-     * @param $list_domains
-     * @return mixed
+     * Check domain information for one or more domains
+     *
+     * @param array $list_domains Array with list of domains. Key is domain, value must be filled.
+     * @return array listDomains
      */
     public function getSyncData($list_domains)
     {
@@ -568,7 +590,9 @@ class Versio implements IRegistrar
     }
 
     /**
-     * @param $domain
+     * Get EPP code/token
+     *
+     * @param string $domain Domain
      * @return bool|string
      */
     public function getToken($domain)
@@ -590,7 +614,9 @@ class Versio implements IRegistrar
     }
 
     /**
-     * @return mixed
+     * Get class version information
+     *
+     * @return array
      */
     public static function getVersionInformation()
     {
@@ -599,16 +625,17 @@ class Versio implements IRegistrar
     }
 
     /**
-     * @param $domain
-     * @param bool $lock
-     * @return bool
+     * Change the lock status of the specified domain.
+     *
+     * @param string $domain The domain to change the lock state for
+     * @param bool $lock The new lock state (True|False)
+     * @return bool True is the lock state was changed successfully
      */
     public function lockDomain($domain, $lock = true)
     {
-        $settings = [];
-        $settings['lock'] = $lock;
-
-        $response = $this->request('POST', '/domains/' . $domain . '/update', $settings);
+        $response = $this->request('POST', '/domains/' . $domain . '/update', [
+            'lock' => $lock
+        ]);
 
         if ($response['error']) {
             $this->Error[] = $response['error']['message'];
@@ -618,12 +645,14 @@ class Versio implements IRegistrar
     }
 
     /**
-     * @param $domain
-     * @param array $nameservers
-     * @param null $whois
-     * @return bool
+     * Register a new domain
+     *
+     * @param string $domain The domainname that needs to be registered.
+     * @param array $nameservers The nameservers for the new domain.
+     * @param array $whois The customer information for the domain's whois information.
+     * @return bool True on success; False otherwise.
      */
-    public function registerDomain($domain, $nameservers = array(), $whois = null)
+    public function registerDomain($domain, $nameservers = [], $whois = null)
     {
         $ownerHandle = "";
 
@@ -670,13 +699,11 @@ class Versio implements IRegistrar
         if (isset($bNs3))
             $nameservers[] = $nameservers['ns3'];
 
-        $data = array(
+        $response = $this->request('POST', '/domains/' . $domain, [
             'years' => 1,
             'contact_id' => $ownerHandle,
             'ns' => $nameservers
-        );
-
-        $response = $this->request('POST', '/domains/' . $domain, $data);
+        ]);
 
         if ($response['error']) {
             $this->Error[] = $response['error']['message'];
@@ -692,7 +719,7 @@ class Versio implements IRegistrar
      * @param array $data
      * @return array|mixed
      */
-    public function request($requesttype, $request, $data = array())
+    public function request($requesttype, $request, $data = [])
     {
         require("version.php");
 
@@ -713,12 +740,7 @@ class Versio implements IRegistrar
         $httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        if ($this->debug) {
-            $debugdata = array('requesttype' => $requesttype, 'url' => $url, 'postdata' => $data, 'result' => $result, 'httpcode' => $httpcode);
-            var_dump($debugdata);
-        }
-
-        $codes = array('200', '201', '202', '400', '401', '404');
+        $codes = ['200', '201', '202', '400', '401', '404'];
 
         $result = json_decode($result, 1);
         $result['httpcode'] = $httpcode;
@@ -733,8 +755,10 @@ class Versio implements IRegistrar
     }
 
     /**
-     * @param $domain
-     * @param $dns_zone
+     * Update the DNS zone of a domain at the registrar
+     *
+     * @param string $domain The domain
+     * @param array $dns_zone Array with DNS zone info and DNS records
      * @return bool
      */
     public function saveDNSZone($domain, $dns_zone)
@@ -748,13 +772,12 @@ class Versio implements IRegistrar
                 $name = $records['name'] . '.' . $domain . '.';
             }
 
-            $dns[] = array('type' => $records['type'], 'name' => $name, 'value' => $records['value'], 'prio' => $records['priority'], 'ttl' => $records['ttl']);
+            $dns[] = ['type' => $records['type'], 'name' => $name, 'value' => $records['value'], 'prio' => $records['priority'], 'ttl' => $records['ttl']];
         }
 
-        $data = [];
-        $data['dns_records'] = $dns;
-
-        $response = $this->request('POST', '/domains/' . $domain . '/update', $data);
+        $response = $this->request('POST', '/domains/' . $domain . '/update', [
+            'dns_records' => $dns
+        ]);
 
         if ($response['error']) {
             $this->Error[] = $response['error']['message'];
@@ -765,16 +788,17 @@ class Versio implements IRegistrar
     }
 
     /**
-     * @param $domain
-     * @param bool $autorenew
-     * @return bool
+     * Change the autorenew state of the given domain. When autorenew is enabled, the domain will be extended.
+     *
+     * @param string $domain The domainname to change the autorenew setting for,
+     * @param bool $autorenew The new autorenew setting (True = On|False = Off)
+     * @return bool True when the setting is succesfully changed; False otherwise
      */
     public function setDomainAutoRenew($domain, $autorenew = true)
     {
-        $settings = [];
-        $settings['auto_renew'] = $autorenew;
-
-        $response = $this->request('POST', '/domains/' . $domain . '/update', $settings);
+        $response = $this->request('POST', '/domains/' . $domain . '/update', [
+            'auto_renew' => $autorenew
+        ]);
 
         if ($response['error']) {
             $this->Error[] = $response['error']['message'];
@@ -785,7 +809,9 @@ class Versio implements IRegistrar
     }
 
     /**
-     * @param $ssl_order_id
+     * Download the CSR of a SSL certificate from the registrar
+     *
+     * @param string $ssl_order_id Order id from a SSL certificate
      * @return bool
      */
     public function ssl_download_ssl_certificate($ssl_order_id)
@@ -801,8 +827,10 @@ class Versio implements IRegistrar
     }
 
     /**
-     * @param $domain
-     * @param $templatename
+     * Retrieve the approver emailadresses for a SSL certificate from the registrar
+     *
+     * @param string $domain Domain name
+     * @param string $templatename ID of the product as retrieved by ssl_list_products()
      * @return array|bool
      */
     public function ssl_get_approver_list($domain, $templatename)
@@ -824,7 +852,9 @@ class Versio implements IRegistrar
     }
 
     /**
-     * @param $templatename
+     * Get SSL product from registrar
+     *
+     * @param string $templatename ID of the product as retrieved by ssl_list_products()
      * @return array
      */
     public function ssl_get_product($templatename)
@@ -855,7 +885,7 @@ class Versio implements IRegistrar
         if (isset($sslProduct['pricing'])) {
             foreach ($sslProduct['pricing']['period'] as $index => $period_fee) {
                 // please note: periods should be in years, not months
-                $product_info['periods'][] = array('periods' => $index, 'price' => $period_fee);
+                $product_info['periods'][] = ['periods' => $index, 'price' => $period_fee];
             }
         }
 
@@ -863,7 +893,9 @@ class Versio implements IRegistrar
     }
 
     /**
-     * @param $ssl_order_id
+     * Retrieve the status of a SSL certificate from the registrar
+     *
+     * @param string $ssl_order_id Order id from a SSL certificate
      * @return array|bool
      */
     public function ssl_get_request_status($ssl_order_id)
@@ -893,7 +925,9 @@ class Versio implements IRegistrar
     }
 
     /**
-     * @param string $ssl_type
+     * Retrieve all SSL products from registrar
+     *
+     * @param string $ssl_type Optional filter for SSL validation type
      * @return array|bool
      */
     public function ssl_list_products($ssl_type = '')
@@ -914,11 +948,11 @@ class Versio implements IRegistrar
                 $product['wildcard'] = ($sslproducts['type'] == 'wildcard') ? 1 : 0;
                 $product['multidomain_max'] = $sslproducts['support_san_names'];
                 $product['max_years'] = $sslproducts['max_years'];
-                $product['pricing']['period'] = array(
+                $product['pricing']['period'] = [
                     1 => $sslproducts['prices']['1_year'],
                     2 => $sslproducts['prices']['2_year'],
                     3 => $sslproducts['prices']['3_year']
-                );
+                ];
 
                 array_push($products_array, $product);
             }
@@ -928,21 +962,21 @@ class Versio implements IRegistrar
     }
 
     /**
-     * @param $ssl_order_id
-     * @param $ssl_info
-     * @param $whois
+     * Reissue a SSL certificate at the registrar
+     *
+     * @param string $ssl_order_id Order id from a SSL certificate
+     * @param array $ssl_info Array with info regarding the SSL certificate
+     * @param object $whois Object with WHOIS data
      * @return bool
      */
     public function ssl_reissue_certificate($ssl_order_id, $ssl_info, $whois)
     {
-        $sslDetails = array(
+        $response = $this->request('POST', '/sslcertificates/' . $ssl_order_id . '/reissue', [
             "csr" => $ssl_info['csr'],
             "approver_email" => $ssl_info['approver_email'],
             "address" => $whois->ownerAddress,
             "postalcode" => $whois->ownerZipCode
-        );
-
-        $response = $this->request('POST', '/sslcertificates/' . $ssl_order_id . '/reissue', $sslDetails);
+        ]);
 
         if ($response['error']) {
             $this->Error[] = $response['error']['message'];
@@ -953,8 +987,10 @@ class Versio implements IRegistrar
     }
 
     /**
-     * @param $ssl_info
-     * @param $whois
+     * Renew the SSL certificate at the registrar
+     *
+     * @param array $ssl_info Array with info regarding the SSL certificate
+     * @param object $whois Object with WHOIS data
      * @return bool|mixed
      */
     public function ssl_renew_certificate($ssl_info, $whois)
@@ -963,13 +999,15 @@ class Versio implements IRegistrar
     }
 
     /**
-     * @param $ssl_info
-     * @param $whois
+     * Request the SSL certificate at the registrar
+     *
+     * @param array $ssl_info Array with info regarding the SSL certificate
+     * @param object $whois Object with WHOIS data
      * @return bool|mixed
      */
     public function ssl_request_certificate($ssl_info, $whois)
     {
-        $sslDetails = array(
+        $response = $this->request('POST', '/sslcertificates', [
             "csr" => $ssl_info['csr'],
             "approver_email" => $ssl_info['approver_email'],
             "product_id" => $ssl_info['templatename'],
@@ -981,9 +1019,7 @@ class Versio implements IRegistrar
             "postalcode" => $whois->ownerZipCode,
             "auto_renew" => true,
             "san_names" => $ssl_info['multidomain_records']
-        );
-
-        $response = $this->request('POST', '/sslcertificates', $sslDetails);
+        ]);
 
         if ($response['error']) {
             $this->Error[] = $response['error']['message'];
@@ -994,15 +1030,17 @@ class Versio implements IRegistrar
     }
 
     /**
-     * @param $ssl_order_id
-     * @param $approver_emailaddress
+     * Resend the approver email
+     *
+     * @param string $ssl_order_id Order id from a SSL certificate
+     * @param string $approver_emailaddress Approver emailaddress
      * @return bool
      */
     public function ssl_resend_approver_email($ssl_order_id, $approver_emailaddress)
     {
-        $sslDetails = array("approver_email" => $approver_emailaddress);
-
-        $response = $this->request('POST', '/sslcertificates/' . $ssl_order_id . '/changeapprover', $sslDetails);
+        $response = $this->request('POST', '/sslcertificates/' . $ssl_order_id . '/changeapprover', [
+            "approver_email" => $approver_emailaddress
+        ]);
 
         if ($response['error']) {
             $this->Error[] = $response['error']['message'];
@@ -1013,7 +1051,9 @@ class Versio implements IRegistrar
     }
 
     /**
-     * @param $ssl_order_id
+     * Revoke SSL certificate at the registrar
+     *
+     * @param string $ssl_order_id Order id from a SSL certificate
      * @return bool
      */
     public function ssl_revoke_ssl_certificate($ssl_order_id)
@@ -1024,22 +1064,20 @@ class Versio implements IRegistrar
             $this->Error[] = $response['error']['message'];
             return false;
         } else {
-            if ($response['status'] == 'CANCELLED') {
-                return true;
-            } else {
-                return false;
-            }
+            return (bool) ($response['status'] == 'CANCELLED');
         }
     }
 
     /**
-     * @param $domain
-     * @param array $nameservers
-     * @param null $whois
+     * Transfer a domain to the given user.
+     *
+     * @param string $domain The demainname that needs to be transfered.
+     * @param array $nameservers The nameservers for the tranfered domain.
+     * @param array $whois The contact information for the new owner, admin, tech and billing contact.
      * @param string $authcode
-     * @return bool
+     * @return bool True on success; False otherwise;
      */
-    public function transferDomain($domain, $nameservers = array(), $whois = null, $authcode = "")
+    public function transferDomain($domain, $nameservers = [], $whois = null, $authcode = "")
     {
         $ownerHandle = "";
 
@@ -1085,14 +1123,12 @@ class Versio implements IRegistrar
         if (isset($bNs3))
             $nameservers[] = $nameservers['ns3'];
 
-        $data = array(
+        $response = $this->request('POST', '/domains/' . $domain . '/transfer', [
             'years' => 1,
             'contact_id' => $ownerHandle,
             'auth_code' => $authcode,
             'ns' => $nameservers
-        );
-
-        $response = $this->request('POST', '/domains/' . $domain . '/transfer', $data);
+        ]);
 
         if ($response['error']) {
             $this->Error[] = $response['error']['message'];
@@ -1103,9 +1139,11 @@ class Versio implements IRegistrar
     }
 
     /**
-     * @param $handle
-     * @param $whois
-     * @param $type
+     * Update the whois information for the given contact person.
+     *
+     * @param string $handle The handle of the contact to be changed.
+     * @param array $whois The new whois information for the given contact.
+     * @param mixed $type The of contact. This is used to access the right fields in the whois array
      * @return bool
      */
     public function updateContact($handle, $whois, $type = HANDLE_OWNER)
@@ -1115,9 +1153,11 @@ class Versio implements IRegistrar
     }
 
     /**
-     * @param $domain
-     * @param $whois
-     * @return bool
+     * Update the domain Whois data, but only if no handles are used by the registrar.
+     *
+     * @param string $domain
+     * @param mixed $whois
+     * @return bool True if successfully, false otherwise
      */
     public function updateDomainWhois($domain, $whois)
     {
@@ -1129,10 +1169,9 @@ class Versio implements IRegistrar
         } else {
             $contactId = $this->createContact($whois);
 
-            $settings = [];
-            $settings['registrant_id'] = $contactId;
-
-            $response = $this->request('POST', '/domains/' . $domain . '/update', $settings);
+            $response = $this->request('POST', '/domains/' . $domain . '/update', [
+                'registrant_id' => $contactId
+            ]);
 
             if ($response['error']) {
                 $this->Error[] = $response['error']['message'];
@@ -1145,35 +1184,37 @@ class Versio implements IRegistrar
     }
 
     /**
-     * @param $domain
-     * @param array $nameservers
-     * @return bool
+     * Update the nameservers for the given domain.
+     *
+     * @param string $domain The domain to be changed.
+     * @param array $nameservers The new set of nameservers.
+     * @return bool True if the update was succesfull; False otherwise;
      */
-    public function updateNameServers($domain, $nameservers = array())
+    public function updateNameServers($domain, $nameservers = [])
     {
         $ns = [];
         if (!$nameservers['ns1'] == null) {
-            $ns[] = array('ns' => $nameservers['ns1'], 'nsip' => '');
+            $ns[] = ['ns' => $nameservers['ns1'], 'nsip' => ''];
         }
 
         if (!$nameservers['ns2'] == null) {
-            $ns[] = array('ns' => $nameservers['ns2'], 'nsip' => '');
+            $ns[] = ['ns' => $nameservers['ns2'], 'nsip' => ''];
         }
 
         if (!$nameservers['ns3'] == null) {
-            $ns[] = array('ns' => $nameservers['ns3'], 'nsip' => '');
+            $ns[] = ['ns' => $nameservers['ns3'], 'nsip' => ''];
         }
 
         if ($nameservers['ns1'] == 'nszero1.axc.nl' || $nameservers['ns2'] == 'nszero2.axc.nl') {
-            $data = array(
+            $data = [
                 'dns_management' => true,
                 'ns' => $ns
-            );
+            ];
         } else {
-            $data = array(
+            $data = [
                 'dns_management' => false,
                 'ns' => $ns
-            );
+            ];
         }
 
         $response = $this->request('POST', '/domains/' . $domain . '/update', $data);
