@@ -145,24 +145,6 @@ class Versio implements IRegistrar
     }
 
     /**
-     * Delete a whois contact
-     *
-     * @param string $handle The handle of a contact
-     * @return bool True if deleted, False and $this->Error[] in case of error.
-     */
-    public function deleteContact($handle)
-    {
-        $response = $this->request('DELETE', '/contacts/' . $handle);
-
-        if ($response['error']) {
-            $this->Error[] = $response['error']['message'];
-            return false;
-        } else {
-            return true;
-        }
-    }
-
-    /**
      * Delete a domain
      *
      * @param string $domain The name of the domain that you want to delete.
@@ -175,60 +157,7 @@ class Versio implements IRegistrar
     }
 
     /**
-     * @param $domain
-     * @param $pendingInfo
-     * @return bool|string
-     */
-    public function doPending($domain, $pendingInfo)
-    {
-        $response = $this->request('GET', '/domains/' . $domain);
-
-        if ($response['error']) {
-            $this->Error[] = $response['error']['message'];
-            return 'pending';
-        } else {
-            switch ($response['domainInfo']['status']) {
-                case 'OK':
-                    $this->Success[] = "Domeinnaam '" . $domain . "' is succesvol aangevraagd.";
-                    return true;
-                    break;
-                case 'PENDING':
-                    return 'pending';
-                    break;
-                case 'INACTIVE':
-                    $this->Error[] = "Domeinnaam '" . $domain . "' aangevraag is mislukt.";
-                    return false;
-                    break;
-                case 'PENDING_TRANSFER':
-                    return 'pending';
-                    break;
-                default:
-                    return 'pending';
-            }
-        }
-    }
-
-    /**
-     * @param string $domain
-     * @param integer $nyears
-     * @return bool
-     */
-    public function extendDomain($domain, $nyears)
-    {
-        $response = $this->request('POST', '/domains/' . $domain, [
-            'years' => $nyears
-        ]);
-
-        if ($response['error']) {
-            $this->Error[] = $response['error']['message'];
-            return false;
-        } else {
-            return true;
-        }
-    }
-
-    /**
-     * Get information availabe of the requested contact.
+     * Get information available of the requested contact.
      *
      * @param string $handle The handle of the contact to request.
      * @return bool|array Information available about the requested contact.
