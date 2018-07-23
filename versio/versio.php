@@ -71,7 +71,7 @@ class Versio implements IRegistrar
     {
         $response = $this->request('GET', '/domains/' . $domain . '/availability');
 
-        if ($response['error']) {
+        if (isset($response['error'])) {
             $this->Error[] = $response['error']['message'];
             return false;
         }
@@ -136,7 +136,7 @@ class Versio implements IRegistrar
 
         $response = $this->request('POST', '/contacts', $contactDetails);
 
-        if ($response['error']) {
+        if (isset($response['error'])) {
             $this->Error[] = $response['error']['message'];
             return false;
         } else {
@@ -166,7 +166,7 @@ class Versio implements IRegistrar
     {
         $response = $this->request('GET', '/contacts/' . $handle);
 
-        if ($response['error']) {
+        if (isset($response['error'])) {
             $this->Error[] = $response['error']['message'];
             return false;
         } else {
@@ -235,32 +235,29 @@ class Versio implements IRegistrar
     {
         $response = $this->request('GET', '/contacts');
 
-        if ($response['error']) {
+        if (isset($response['error'])) {
             $this->Error[] = $response['error']['message'];
             return false;
         } else {
-            $contactsList = [];
+            $contactList = [];
 
-            foreach ($response['ContactList'] as $contactlist) {
-                $contact = [];
-                $contact['Handle'] = $contactlist['contact_id'];
-                $contact['Sex'] = ''; // Not provided in Versio API
-                $contact['Initials'] = $contactlist['firstname'];
-                $contact['SurName'] = $contactlist['surname'];
-                $contact['CompanyName'] = $contactlist['company'];
-
-                $contact['Address'] = $contactlist['street'] . ' ' . $contactlist['number'];
-                $contact['ZipCode'] = $contactlist['zipcode'];
-                $contact['City'] = $contactlist['city'];
-                $contact['Country'] = $contactlist['country'];
-
-                $contact['PhoneNumber'] = $contactlist['phone'];
-                $contact['EmailAddress'] = $contactlist['email'];
-
-                $contactsList[] = $contact;
+            foreach ($response['ContactList'] as $contact) {
+                $contactList[] = [
+                    'Handle' => $contact['contact_id'],
+                    'Sex' => '',
+                    'Initials' => $contact['firstname'],
+                    'SurName' => $contact['surname'],
+                    'CompanyName' => $contact['company'],
+                    'Address' => $contact['street'] . ' ' . $contact['number'],
+                    'ZipCode' => $contact['zipcode'],
+                    'City' => $contact['city'],
+                    'Country' => $contact['country'],
+                    'PhoneNumber' => $contact['phone'],
+                    'EmailAddress' => $contact['email'],
+                ];
             }
 
-            return $contactsList;
+            return $contactList;
         }
     }
 
@@ -526,15 +523,15 @@ class Versio implements IRegistrar
      */
     public function getToken($domain)
     {
-        $aDomain = explode('.', $domain);
-
         $response = $this->request('GET', '/domains/' . $domain . '?show_epp_code=true');
 
-        if ($response['error']) {
+        if (isset($response['error'])) {
             $this->Error[] = $response['error']['message'];
             return false;
         } else {
-            if ($aDomain[1] == 'be') {
+            $explodedDomain = explode('.', $domain);
+
+            if ($explodedDomain[1] == 'be') {
                 return 'EPP code will be sent by email';
             } else {
                 return $response['domainInfo']['epp_code'];
@@ -549,8 +546,7 @@ class Versio implements IRegistrar
      */
     public static function getVersionInformation()
     {
-        require_once '3rdparty/domain/versio/version.php';
-        return $version;
+        return require_once __DIR__ . '/version.php';
     }
 
     /**
@@ -653,9 +649,9 @@ class Versio implements IRegistrar
         require("version.php");
 
         if ($this->Testmode == '1') {
-            $this->endpoint = 'https://www.versio' . $version['site_version'] . '/testapi/v1';
+            $this->endpoint = 'https://www.versio.nl/testapi/v1';
         } else {
-            $this->endpoint = 'https://www.versio' . $version['site_version'] . '/api/v1';
+            $this->endpoint = 'https://www.versio.nl/api/v1';
         }
 
         $url = $this->endpoint . $request;
@@ -729,7 +725,7 @@ class Versio implements IRegistrar
             'auto_renew' => $autorenew
         ]);
 
-        if ($response['error']) {
+        if (isset($response['error'])) {
             $this->Error[] = $response['error']['message'];
             return false;
         } else {

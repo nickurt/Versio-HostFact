@@ -1,0 +1,12 @@
+{
+    "name": "nickurt/versio-hostfact",
+    "require-dev": {
+        "phpunit/phpunit": "^7.2",
+        "mockery/mockery": "^1.1"
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "nickurt\\VersioHostFact\\Tests\\": "tests/"
+        }
+    }
+}

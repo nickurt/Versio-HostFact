@@ -1,4 +1,7 @@
 <?php
+
+$version = [];
+
 $version['name']            = "Versio";
 $version['api_version']     = "1.0 REST API";
 $version['date']            = "2018-07-05";
@@ -20,5 +23,4 @@ $version['dns_management_support'] = true;
 $version['dns_templates_support'] = true;
 $version['dns_records_support'] = true;
 
-$version['site_version']   = '.nl'; // .nl, .eu, .uk
-?>
+return $version;
