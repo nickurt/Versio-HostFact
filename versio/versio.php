@@ -212,16 +212,13 @@ class Versio implements IRegistrar
                 break;
         }
 
-        unset($handle);
-        unset($reponse);
+        $response = $this->request('GET', '/contacts' . $whois->{$prefix . 'Handle'});
 
-        $response = $this->request('GET', '/contacts' . $whois->ownerRegistrarHandles['versio']);
-
-        if ($response['error']) {
+        if (isset($response['error'])) {
             $this->Error[] = $response['error']['message'];
             return false;
         } else {
-            return true;
+            return $response['contactInfo']['contact_id'];
         }
     }
 
